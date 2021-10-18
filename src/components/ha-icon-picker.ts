@@ -1,14 +1,17 @@
+import { mdiCheck, mdiMenuDown, mdiMenuUp } from "@mdi/js";
 import "@polymer/paper-input/paper-input";
-import { mdiCheck } from "@mdi/js";
+import "@polymer/paper-item/paper-icon-item";
+import "@polymer/paper-item/paper-item-body";
+import "@vaadin/vaadin-combo-box/theme/material/vaadin-combo-box-light";
 import { css, html, LitElement, TemplateResult } from "lit";
 import { ComboBoxLitRenderer, comboBoxRenderer } from "lit-vaadin-helpers";
 import { customElement, property, query } from "lit/decorators";
 import { fireEvent } from "../common/dom/fire_event";
 import { PolymerChangedEvent } from "../polymer-types";
 import "./ha-icon";
-import iconList from "../../build/mdi/iconList.json";
+import "./ha-icon-button";
 
-const mdiIconList = iconList.map((icon) => `mdi:${icon}`);
+let mdiIconList: string[] = [];
 
 // eslint-disable-next-line lit/prefer-static-styles
 const rowRenderer: ComboBoxLitRenderer<string> = (item) => html`<style>
@@ -35,7 +38,7 @@ const rowRenderer: ComboBoxLitRenderer<string> = (item) => html`<style>
   <ha-svg-icon .path=${mdiCheck}></ha-svg-icon>
   <paper-icon-item>
     <ha-icon .icon=${item} slot="item-icon"></ha-icon>
-    <paper-item-body> ${item} </paper-item-body>
+    <paper-item-body>${item}</paper-item-body>
   </paper-icon-item>`;
 
 @customElement("ha-icon-picker")
@@ -61,11 +64,10 @@ export class HaIconPicker extends LitElement {
         item-label-path="icon"
         .value=${this._value}
         .allowCustomValue=${true}
-        .filteredItems=${[]}
+        .items=${mdiIconList}
         ${comboBoxRenderer(rowRenderer)}
         @opened-changed=${this._openedChanged}
         @value-changed=${this._valueChanged}
-        @filter-changed=${this._filterChanged}
       >
         <paper-input
           .label=${this.label}
@@ -77,19 +79,29 @@ export class HaIconPicker extends LitElement {
           autocorrect="off"
           spellcheck="false"
         >
-          ${!this._opened && (this._value || this.placeholder)
+          ${this._value || this.placeholder
             ? html`
-                <ha-icon .icon=${this._value || this.placeholder} slot="suffix">
+                <ha-icon .icon=${this._value || this.placeholder} slot="prefix">
                 </ha-icon>
               `
             : ""}
+          <ha-icon-button
+            .path=${this._opened ? mdiMenuUp : mdiMenuDown}
+            slot="suffix"
+            class="toggle-button"
+          ></ha-icon-button>
         </paper-input>
       </vaadin-combo-box-light>
     `;
   }
 
-  private _openedChanged(ev: PolymerChangedEvent<boolean>) {
+  private async _openedChanged(ev: PolymerChangedEvent<boolean>) {
     this._opened = ev.detail.value;
+    if (this._opened && !mdiIconList.length) {
+      const iconList = await import("../../build/mdi/iconList.json");
+      mdiIconList = iconList.default.map((icon) => `mdi:${icon}`);
+      (this.comboBox as any).items = mdiIconList;
+    }
   }
 
   private _valueChanged(ev: PolymerChangedEvent<string>) {
@@ -109,23 +121,6 @@ export class HaIconPicker extends LitElement {
     );
   }
 
-  private _filterChanged(ev: CustomEvent): void {
-    const filterString = ev.detail.value.toLowerCase();
-    const characterCount = filterString.length;
-    if (characterCount >= 2) {
-      const filteredItems = mdiIconList.filter((icon) =>
-        icon.toLowerCase().includes(filterString)
-      );
-      if (filteredItems.length > 0) {
-        (this.comboBox as any).filteredItems = filteredItems;
-      } else {
-        (this.comboBox as any).filteredItems = [filterString];
-      }
-    } else {
-      (this.comboBox as any).filteredItems = [];
-    }
-  }
-
   private get _value() {
     return this.value || "";
   }
@@ -133,10 +128,21 @@ export class HaIconPicker extends LitElement {
   static get styles() {
     return css`
       ha-icon {
-        position: absolute;
-        bottom: 2px;
-        right: 0;
+        position: relative;
+        top: -2px;
+        margin-right: 4px;
+      }
+      paper-input > ha-icon-button {
+        --mdc-icon-button-size: 24px;
+        padding: 2px;
+        color: var(--secondary-text-color);
       }
     `;
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "ha-icon-picker": HaIconPicker;
   }
 }
